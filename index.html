@@ -479,33 +479,46 @@ body {
 
 <script>
 // ========================================
+// ゲーム設定
+// ========================================
+
 // モンスター画像の設定
 // monsterディレクトリに画像を追加したら、この数値を変更してください
 // 例：monster1.png ~ monster20.png がある場合は 20 に設定
+const MONSTER_COUNT = 4;
+
+// 難易度変更の閾値設定
+// 連続正解数がこの数値に到達すると難易度が上がります
+const INTERMEDIATE_THRESHOLD = 25;  // 初級→中級
+const ADVANCED_THRESHOLD = 50;      // 中級→上級
+
+// HP回復の設定
+const HP_RECOVERY_INTERVAL = 10;   // 連続正解がこの倍数でHP回復
+const HP_RECOVERY_AMOUNT = 10;     // 回復するHP量
+
 // ========================================
-const MONSTER_COUNT = 15;
 
 // モンスター画像の配列を自動生成
 const monsterImages = Array.from({length: MONSTER_COUNT}, (_, i) => `monster/monster${i + 1}.png`);
 
 let quizzes = [];
-let quizzesBeginner = []; // 初級問題
-let quizzesIntermediate = []; // 中級問題
-let quizzesAdvanced = []; // 上級問題
+let quizzesBeginner = [];
+let quizzesIntermediate = [];
+let quizzesAdvanced = [];
 let comments = [];
 let playerHP, enemyHP, defeatedCount;
 let currentQuiz, shuffledChoices, isAnswering = true;
 let isGameOver = false;
 let lastQuizId = null;
 let selectedIndex = null;
-let currentDifficulty = "beginner"; // 現在の難易度
+let currentDifficulty = "beginner";
 
 // 統計情報
 let correctAnswers = 0;
 let wrongAnswers = 0;
 let currentCombo = 0;
 let maxCombo = 0;
-let maxDifficulty = "beginner"; // 到達した最高難易度
+let maxDifficulty = "beginner";
 let gameStartTime = 0;
 let gameOverDateTime = "";
 
@@ -514,7 +527,7 @@ fetch("JSON/quizzes_beginner.json")
   .then(r => r.json())
   .then(d => {
     quizzesBeginner = d;
-    quizzes = quizzesBeginner; // 最初は初級
+    quizzes = quizzesBeginner;
     checkAllDataLoaded();
   })
   .catch(err => {
@@ -595,12 +608,12 @@ function startGame() {
   wrongAnswers = 0;
   currentCombo = 0;
   maxCombo = 0;
-  maxDifficulty = "beginner"; // 最高難易度をリセット
+  maxDifficulty = "beginner";
   gameStartTime = Date.now();
   lastQuizId = null;
   selectedIndex = null;
-  currentDifficulty = "beginner"; // 難易度を初級に
-  quizzes = quizzesBeginner; // 初級問題を使用
+  currentDifficulty = "beginner";
+  quizzes = quizzesBeginner;
   
   updateScore();
   spawnEnemy();
@@ -619,12 +632,12 @@ function restartGame() {
   wrongAnswers = 0;
   currentCombo = 0;
   maxCombo = 0;
-  maxDifficulty = "beginner"; // 最高難易度をリセット
+  maxDifficulty = "beginner";
   gameStartTime = Date.now();
   lastQuizId = null;
   selectedIndex = null;
-  currentDifficulty = "beginner"; // 難易度を初級に
-  quizzes = quizzesBeginner; // 初級問題を使用
+  currentDifficulty = "beginner";
+  quizzes = quizzesBeginner;
   
   updateScore();
   spawnEnemy();
@@ -652,10 +665,10 @@ function nextQuiz() {
   }
   
   isAnswering = true;
-  selectedIndex = null; // 選択をリセット
+  selectedIndex = null;
   document.getElementById("explanation").textContent = "";
   document.getElementById("nextBtn").style.display = "none";
-  document.getElementById("answerBtn").style.display = "none"; // 解答ボタンを非表示
+  document.getElementById("answerBtn").style.display = "none";
   
   let availableQuizzes = quizzes;
   if (lastQuizId !== null && quizzes.length > 1) {
@@ -705,15 +718,12 @@ function popup(text, color) {
 function selectChoice(index) {
   if (!isAnswering || isGameOver) return;
   
-  // すべての選択肢から選択状態を解除
   const buttons = document.querySelectorAll(".choice-btn-full");
   buttons.forEach(btn => btn.classList.remove("selected"));
   
-  // クリックした選択肢を選択状態にする
   buttons[index].classList.add("selected");
   selectedIndex = index;
   
-  // 解答ボタンを表示
   document.getElementById("answerBtn").style.display = "inline-block";
 }
 
@@ -722,7 +732,6 @@ function submitAnswer() {
   
   handleAnswer(selectedIndex);
   
-  // 解答ボタンを非表示
   document.getElementById("answerBtn").style.display = "none";
 }
 
@@ -740,9 +749,9 @@ function handleAnswer(i) {
       maxCombo = currentCombo;
     }
     
-    // HP回復チェック（10の倍数）
-    if (currentCombo > 0 && currentCombo % 10 === 0) {
-      playerHP = Math.min(100, playerHP + 10);
+    // HP回復チェック（設定された倍数）
+    if (currentCombo > 0 && currentCombo % HP_RECOVERY_INTERVAL === 0) {
+      playerHP = Math.min(100, playerHP + HP_RECOVERY_AMOUNT);
       popup(`${currentCombo}連続正解！HP回復！`, "#00FF00");
       flash("flash-heal");
       if (navigator.vibrate) {
@@ -751,14 +760,14 @@ function handleAnswer(i) {
     }
     
     updateScore();
-    changeDifficulty(); // 難易度変更チェック
+    changeDifficulty();
     
     const willDefeatMonster = (enemyHP - 25) <= 0;
     enemyHP = Math.max(0, enemyHP - 25);
     
     if (!willDefeatMonster) {
       flash("flash-correct");
-      if (currentCombo % 10 !== 0) { // HP回復時はPERFECT表示をスキップ
+      if (currentCombo % HP_RECOVERY_INTERVAL !== 0) {
         popup("PERFECT!!", "gold");
       }
     }
@@ -883,7 +892,6 @@ function gameOver() {
     document.getElementById("accuracy").textContent = `${accuracyPercent}%`;
     document.getElementById("maxCombo").textContent = maxCombo;
     
-    // 最高難易度を表示
     let maxDifficultyText = "";
     if (maxDifficulty === "beginner") {
       maxDifficultyText = "初級";
@@ -911,7 +919,6 @@ function updateScore() {
   document.getElementById("defeatedCount").textContent = defeatedCount;
   document.getElementById("comboCount").textContent = currentCombo;
   
-  // 難易度表示を更新
   const difficultyDisplay = document.getElementById("difficultyDisplay");
   let difficultyText = "";
   let difficultyColor = "";
@@ -932,12 +939,12 @@ function updateScore() {
 }
 
 function changeDifficulty() {
-  if (currentCombo >= 5 && currentDifficulty !== "advanced") {
+  if (currentCombo >= ADVANCED_THRESHOLD && currentDifficulty !== "advanced") {
     currentDifficulty = "advanced";
     quizzes = quizzesAdvanced;
     maxDifficulty = "advanced";
     showLevelUpEffect("上級", "advanced");
-  } else if (currentCombo >= 3 && currentDifficulty === "beginner") {
+  } else if (currentCombo >= INTERMEDIATE_THRESHOLD && currentDifficulty === "beginner") {
     currentDifficulty = "intermediate";
     quizzes = quizzesIntermediate;
     if (maxDifficulty === "beginner") {
@@ -949,18 +956,15 @@ function changeDifficulty() {
 }
 
 function showLevelUpEffect(difficultyText, difficultyClass) {
-  // バイブレーション
   if (navigator.vibrate) {
     navigator.vibrate([200, 100, 200, 100, 200]);
   }
   
-  // 画面フラッシュ
   const f = document.getElementById("screenFlash");
   f.className = "";
   void f.offsetWidth;
   f.className = `flash-levelup-${difficultyClass}`;
   
-  // レベルアップエフェクト表示
   const effect = document.getElementById("levelUpEffect");
   const text = document.getElementById("levelUpText");
   const difficulty = document.getElementById("levelUpDifficulty");
