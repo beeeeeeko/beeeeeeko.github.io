@@ -510,7 +510,7 @@ let gameStartTime = 0;
 let gameOverDateTime = "";
 
 // クイズデータの読み込み（初級）
-fetch("quizzes_beginner.json")
+fetch("JSON/quizzes_beginner.json")
   .then(r => r.json())
   .then(d => {
     quizzesBeginner = d;
@@ -522,7 +522,7 @@ fetch("quizzes_beginner.json")
   });
 
 // クイズデータの読み込み（中級）
-fetch("quizzes_intermediate.json")
+fetch("JSON/quizzes_intermediate.json")
   .then(r => r.json())
   .then(d => {
     quizzesIntermediate = d;
@@ -533,7 +533,7 @@ fetch("quizzes_intermediate.json")
   });
 
 // クイズデータの読み込み（上級）
-fetch("quizzes_advanced.json")
+fetch("JSON/quizzes_advanced.json")
   .then(r => r.json())
   .then(d => {
     quizzesAdvanced = d;
@@ -544,7 +544,7 @@ fetch("quizzes_advanced.json")
   });
 
 // コメントデータの読み込み
-fetch("comments.json")
+fetch("JSON/comments.json")
   .then(r => r.json())
   .then(d => {
     comments = d;
