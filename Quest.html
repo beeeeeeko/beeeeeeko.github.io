@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>モンスタークイズバトル</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: sans-serif;
+  background: black;
+  color: white;
+  text-align: center;
+}
+
+/* ===== スプラッシュ ===== */
+#splashScreen {
+  position: fixed;
+  inset: 0;
+  background: black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 1s;
+}
+
+#splashScreen img {
+  max-width: 60%;
+}
+
+#splashScreen.show { opacity: 1; }
+#splashScreen.hide { opacity: 0; pointer-events: none; }
+
+/* ===== 画面共通 ===== */
+#titleScreen, #game, #resultScreen {
+  max-width: 600px;
+  margin: auto;
+  padding: 20px;
+  display: none;
+}
+
+#titleScreen {
+  padding-top: 80px;
+}
+
+#titleScreen button {
+  margin-top: 30px;
+}
+
+#titleLogo {
+  max-width: 80%;
+  width: 450px;
+  height: auto;
+  margin: 40px auto 30px;
+  display: block;
+  animation: titleFloat 3s ease-in-out infinite;
+}
+
+@keyframes titleFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+#monsterImg {
+  max-width: 100%;
+  height: 180px;
+  object-fit: contain;
+}
+
+.bar {
+  height: 20px;
+  background: #555;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.bar-inner {
+  height: 100%;
+  transition: width 0.3s;
+}
+#playerBar { background: linear-gradient(90deg, #4caf50, #8bc34a); }
+#enemyBar { background: linear-gradient(90deg, #f44336, #ff5722); }
+
+#question, #explanation {
+  white-space: pre-line;
+  margin-top: 15px;
+}
+
+#choicesContainer {
+  margin: 20px 0;
+}
+
+.choice-btn-full {
+  width: 100%;
+  background: rgba(100, 100, 100, 0.3);
+  border: 2px solid #888;
+  border-radius: 10px;
+  padding: 15px 20px;
+  margin: 10px 0;
+  text-align: left;
+  font-size: 18px;
+  line-height: 1.6;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-family: sans-serif;
+}
+
+.choice-btn-full:hover:not(:disabled) {
+  background: rgba(100, 100, 100, 0.5);
+  border-color: #aaa;
+  transform: translateX(5px);
+}
+
+.choice-btn-full:disabled {
+  cursor: not-allowed;
+}
+
+.choice-btn-full.selected {
+  background: rgba(33, 150, 243, 0.5);
+  border-color: #2196F3;
+  border-width: 3px;
+  transform: translateX(5px);
+}
+
+.choice-number {
+  display: inline-block;
+  font-weight: bold;
+  color: #FFD700;
+  margin-right: 10px;
+  font-size: 20px;
+}
+
+#nextBtn, #restartBtn {
+  margin-top: 20px;
+  padding: 15px 30px;
+  font-size: 20px;
+  cursor: pointer;
+  background: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  display: none;
+}
+
+#nextBtn:hover, #restartBtn:hover {
+  background: #1976D2;
+}
+
+#answerBtn {
+  padding: 15px 30px;
+  font-size: 20px;
+  cursor: pointer;
+  background: #FF9800;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  display: none;
+}
+
+#answerBtn:hover {
+  background: #F57C00;
+}
+
+.start-btn {
+  padding: 15px 30px;
+  font-size: 20px;
+  cursor: pointer;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  transition: all 0.3s;
+}
+
+.start-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+.start-btn:active {
+  transform: translateY(0);
+}
+
+.start-btn:disabled {
+  background: #666;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ===== 演出 ===== */
+#screenFlash {
+  position: fixed;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 4000;
+}
+
+.flash-correct {
+  background: rgba(255, 215, 0, 0.4);
+  animation: flash 0.4s;
+}
+.flash-wrong {
+  background: rgba(255, 0, 0, 0.4);
+  animation: flash 0.4s;
+}
+.flash-heal {
+  background: rgba(0, 255, 0, 0.5);
+  animation: flash 0.6s;
+}
+.flash-levelup-intermediate {
+  background: rgba(255, 193, 7, 0.6);
+  animation: flash 0.6s;
+}
+.flash-levelup-advanced {
+  background: rgba(255, 23, 68, 0.6);
+  animation: flash 0.6s;
+}
+
+@keyframes flash {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+#popupText {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  font-weight: bold;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 4500;
+  text-shadow: 2px 2px 4px black;
+}
+
+.popup-show {
+  animation: popup 1s forwards;
+}
+
+@keyframes popup {
+  0% { transform: scale(0.5); opacity: 0; }
+  30% { transform: scale(1.5); opacity: 1; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+#defeatEffect, #gameoverEffect {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  font-weight: bold;
+  background: rgba(0,0,0,0.7);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 5000;
+}
+
+#defeatEffect.show {
+  animation: explode 1s forwards;
+}
+
+#gameoverEffect.show {
+  animation: gameoverAnim 1.5s forwards;
+}
+
+/* レベルアップエフェクト */
+#levelUpEffect {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.85);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 6000;
+}
+
+#levelUpEffect.show {
+  animation: levelUpShow 2.5s forwards;
+}
+
+#levelUpText {
+  font-size: 64px;
+  font-weight: bold;
+  color: #FFD700;
+  text-shadow: 0 0 30px #FFD700, 0 0 60px #FFD700;
+  margin-bottom: 30px;
+}
+
+#levelUpDifficulty {
+  font-size: 80px;
+  font-weight: bold;
+  text-shadow: 0 0 40px currentColor;
+}
+
+#levelUpEffect.intermediate #levelUpDifficulty {
+  color: #FFC107;
+  animation: difficultyPulse 2.5s;
+}
+
+#levelUpEffect.advanced #levelUpDifficulty {
+  color: #FF1744;
+  animation: difficultyPulse 2.5s;
+}
+
+@keyframes levelUpShow {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes difficultyPulse {
+  0%, 100% { transform: scale(1); }
+  10%, 30%, 50% { transform: scale(1.3); }
+  20%, 40%, 60% { transform: scale(1.1); }
+}
+
+@keyframes explode {
+  from { transform: scale(1); opacity: 1; color: yellow; }
+  to { transform: scale(3) rotate(360deg); opacity: 0; color: red; }
+}
+
+@keyframes gameoverAnim {
+  0% { transform: scale(0.5); opacity: 0; color: red; }
+  50% { transform: scale(1.2); opacity: 1; color: darkred; }
+  100% { transform: scale(1); opacity: 1; color: darkred; }
+}
+
+#monsterImg.defeat {
+  animation: monsterFly 1s forwards;
+}
+
+@keyframes monsterFly {
+  to {
+    transform: scale(0) rotate(360deg) translateY(-100px);
+    opacity: 0;
+  }
+}
+
+#score {
+  font-size: 20px;
+  margin: 10px 0;
+  color: #FFD700;
+}
+
+#difficultyDisplay {
+  font-weight: bold;
+  text-shadow: 0 0 10px currentColor;
+  transition: color 0.3s;
+}
+
+/* ランク表示のアニメーション */
+@keyframes rankPop {
+  0% { transform: scale(0) rotate(-180deg); opacity: 0; }
+  50% { transform: scale(1.3) rotate(10deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+.rank-S { color: #FFD700; text-shadow: 0 0 20px #FFD700; }
+.rank-A { color: #00FF00; text-shadow: 0 0 20px #00FF00; }
+.rank-B { color: #00BFFF; text-shadow: 0 0 20px #00BFFF; }
+.rank-C { color: #FFA500; text-shadow: 0 0 20px #FFA500; }
+.rank-D { color: #FF6347; text-shadow: 0 0 20px #FF6347; }
+</style>
+</head>
+
+<body>
+
+<!-- スプラッシュ -->
+<div id="splashScreen">
+  <img src="LOGO/logo.png" alt="Company Logo">
+</div>
+
+<div id="screenFlash"></div>
+<div id="popupText"></div>
+<div id="levelUpEffect">
+  <div id="levelUpText"></div>
+  <div id="levelUpDifficulty"></div>
+</div>
+<div id="defeatEffect">MONSTER DEFEATED!</div>
+<div id="gameoverEffect">GAME OVER</div>
+
+<!-- タイトル -->
+<div id="titleScreen">
+  <img id="titleLogo" src="LOGO/title.png" alt="モンスタークイズバトル">
+  <p id="loadingText" style="min-height: 24px;">クイズデータ読み込み中...</p>
+  <button id="startBtn" class="start-btn" onclick="startGame()" disabled>スタート</button>
+</div>
+
+<!-- ゲーム -->
+<div id="game">
+  <div id="score">討伐数: <span id="defeatedCount">0</span> | 連続正解: <span id="comboCount">0</span> | 難易度: <span id="difficultyDisplay">初級</span></div>
+  
+  <img id="monsterImg" alt="モンスター">
+
+  <div>モンスターHP <span id="enemyHPText">100/100</span></div>
+  <div class="bar"><div id="enemyBar" class="bar-inner"></div></div>
+
+  <div>プレイヤーHP <span id="playerHPText">100/100</span></div>
+  <div class="bar"><div id="playerBar" class="bar-inner"></div></div>
+
+  <div id="question"></div>
+  
+  <div id="choicesContainer">
+    <button class="choice-btn-full" data-index="0"></button>
+    <button class="choice-btn-full" data-index="1"></button>
+    <button class="choice-btn-full" data-index="2"></button>
+    <button class="choice-btn-full" data-index="3"></button>
+  </div>
+
+  <div id="explanation"></div>
+  <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+    <button id="answerBtn" onclick="submitAnswer()">解答する</button>
+    <button id="nextBtn" onclick="nextQuiz()">次の問題へ</button>
+  </div>
+</div>
+
+<!-- リザルト画面 -->
+<div id="resultScreen">
+  <h1 style="color: #ff4444; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">GAME OVER</h1>
+  
+  <div id="rankDisplay" style="font-size: 72px; margin: 20px 0; animation: rankPop 0.5s ease-out;"></div>
+  
+  <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; margin: 20px 0;">
+    <h2 style="color: #FFD700; margin-top: 0;">📊 プレイ結果</h2>
+    
+    <div style="text-align: left; max-width: 400px; margin: auto;">
+      <p style="margin: 10px 0; font-size: 18px;">
+        🗓️ <strong>日時:</strong> <span id="gameoverDateTime"></span>
+      </p>
+      <p style="margin: 10px 0; font-size: 18px;">
+        ⏱️ <strong>プレイ時間:</strong> <span id="playTime"></span>
+      </p>
+      <p style="margin: 10px 0; font-size: 18px;">
+        👹 <strong>討伐数:</strong> <span id="finalDefeated"></span>体
+      </p>
+      <p style="margin: 10px 0; font-size: 18px;">
+        ✅ <strong>正解数:</strong> <span id="correctCount"></span>問
+      </p>
+      <p style="margin: 10px 0; font-size: 18px;">
+        ❌ <strong>不正解数:</strong> <span id="wrongCount"></span>問
+      </p>
+      <p style="margin: 10px 0; font-size: 18px;">
+        📈 <strong>正解率:</strong> <span id="accuracy"></span>
+      </p>
+      <p style="margin: 10px 0; font-size: 18px;">
+        🔥 <strong>最大コンボ:</strong> <span id="maxCombo"></span>連続
+      </p>
+      <p style="margin: 10px 0; font-size: 18px;">
+        ⭐ <strong>到達難易度:</strong> <span id="maxDifficultyDisplay"></span>
+      </p>
+    </div>
+  </div>
+  
+  <div id="rankComment" style="margin: 20px 0; font-size: 18px; color: #FFD700;"></div>
+  
+  <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+    <button class="start-btn" onclick="restartGame()" style="background: #4CAF50;">
+      🔄 リトライ
+    </button>
+    <button class="start-btn" onclick="goToTitle()" style="background: #2196F3;">
+      🏠 タイトルへ
+    </button>
+  </div>
+</div>
+
+<script>
+// ========================================
+// モンスター画像の設定
+// monsterディレクトリに画像を追加したら、この数値を変更してください
+// 例：monster1.png ~ monster20.png がある場合は 20 に設定
+// ========================================
+const MONSTER_COUNT = 4;
+
+// モンスター画像の配列を自動生成
+const monsterImages = Array.from({length: MONSTER_COUNT}, (_, i) => `monster/monster${i + 1}.png`);
+
+let quizzes = [];
+let quizzesBeginner = []; // 初級問題
+let quizzesIntermediate = []; // 中級問題
+let quizzesAdvanced = []; // 上級問題
+let comments = [];
+let playerHP, enemyHP, defeatedCount;
+let currentQuiz, shuffledChoices, isAnswering = true;
+let isGameOver = false;
+let lastQuizId = null;
+let selectedIndex = null;
+let currentDifficulty = "beginner"; // 現在の難易度
+
+// 統計情報
+let correctAnswers = 0;
+let wrongAnswers = 0;
+let currentCombo = 0;
+let maxCombo = 0;
+let maxDifficulty = "beginner"; // 到達した最高難易度
+let gameStartTime = 0;
+let gameOverDateTime = "";
+
+// クイズデータの読み込み（初級）
+fetch("quizzes_beginner.json")
+  .then(r => r.json())
+  .then(d => {
+    quizzesBeginner = d;
+    quizzes = quizzesBeginner; // 最初は初級
+    checkAllDataLoaded();
+  })
+  .catch(err => {
+    console.error("初級クイズデータの読み込みに失敗しました:", err);
+  });
+
+// クイズデータの読み込み（中級）
+fetch("quizzes_intermediate.json")
+  .then(r => r.json())
+  .then(d => {
+    quizzesIntermediate = d;
+    checkAllDataLoaded();
+  })
+  .catch(err => {
+    console.error("中級クイズデータの読み込みに失敗しました:", err);
+  });
+
+// クイズデータの読み込み（上級）
+fetch("quizzes_advanced.json")
+  .then(r => r.json())
+  .then(d => {
+    quizzesAdvanced = d;
+    checkAllDataLoaded();
+  })
+  .catch(err => {
+    console.error("上級クイズデータの読み込みに失敗しました:", err);
+  });
+
+// コメントデータの読み込み
+fetch("comments.json")
+  .then(r => r.json())
+  .then(d => {
+    comments = d;
+  })
+  .catch(err => {
+    console.error("コメントデータの読み込みに失敗しました:", err);
+    comments = [
+      "🎉 お疲れ様でした！",
+      "✨ 頑張りましたね！",
+      "👍 ナイスファイト！"
+    ];
+  });
+
+// すべてのデータが読み込まれたかチェック
+function checkAllDataLoaded() {
+  if (quizzesBeginner.length > 0 && quizzesIntermediate.length > 0 && quizzesAdvanced.length > 0) {
+    document.getElementById("loadingText").textContent = "↓ボタンを押してスタート↓";
+    document.getElementById("startBtn").disabled = false;
+  }
+}
+
+/* ===== スプラッシュ制御 ===== */
+window.onload = () => {
+  const splash = document.getElementById("splashScreen");
+  const title = document.getElementById("titleScreen");
+
+  splash.classList.add("show");
+
+  setTimeout(() => {
+    splash.classList.remove("show");
+    splash.classList.add("hide");
+    setTimeout(() => {
+      splash.style.display = "none";
+      title.style.display = "block";
+    }, 1000);
+  }, 2000);
+};
+
+function startGame() {
+  document.getElementById("titleScreen").style.display = "none";
+  document.getElementById("game").style.display = "block";
+  playerHP = 100;
+  enemyHP = 100;
+  defeatedCount = 0;
+  isGameOver = false;
+  
+  correctAnswers = 0;
+  wrongAnswers = 0;
+  currentCombo = 0;
+  maxCombo = 0;
+  maxDifficulty = "beginner"; // 最高難易度をリセット
+  gameStartTime = Date.now();
+  lastQuizId = null;
+  selectedIndex = null;
+  currentDifficulty = "beginner"; // 難易度を初級に
+  quizzes = quizzesBeginner; // 初級問題を使用
+  
+  updateScore();
+  spawnEnemy();
+  nextQuiz();
+}
+
+function restartGame() {
+  document.getElementById("resultScreen").style.display = "none";
+  document.getElementById("game").style.display = "block";
+  playerHP = 100;
+  enemyHP = 100;
+  defeatedCount = 0;
+  isGameOver = false;
+  
+  correctAnswers = 0;
+  wrongAnswers = 0;
+  currentCombo = 0;
+  maxCombo = 0;
+  maxDifficulty = "beginner"; // 最高難易度をリセット
+  gameStartTime = Date.now();
+  lastQuizId = null;
+  selectedIndex = null;
+  currentDifficulty = "beginner"; // 難易度を初級に
+  quizzes = quizzesBeginner; // 初級問題を使用
+  
+  updateScore();
+  spawnEnemy();
+  nextQuiz();
+}
+
+function goToTitle() {
+  document.getElementById("resultScreen").style.display = "none";
+  document.getElementById("titleScreen").style.display = "block";
+}
+
+function spawnEnemy() {
+  enemyHP = 100;
+  const m = document.getElementById("monsterImg");
+  m.src = monsterImages[Math.floor(Math.random() * monsterImages.length)];
+  m.classList.remove("defeat");
+  updateHP();
+}
+
+function nextQuiz() {
+  if (isGameOver) return;
+  
+  if (enemyHP <= 0) {
+    spawnEnemy();
+  }
+  
+  isAnswering = true;
+  selectedIndex = null; // 選択をリセット
+  document.getElementById("explanation").textContent = "";
+  document.getElementById("nextBtn").style.display = "none";
+  document.getElementById("answerBtn").style.display = "none"; // 解答ボタンを非表示
+  
+  let availableQuizzes = quizzes;
+  if (lastQuizId !== null && quizzes.length > 1) {
+    availableQuizzes = quizzes.filter(q => q.id !== lastQuizId);
+  }
+  
+  currentQuiz = availableQuizzes[Math.floor(Math.random() * availableQuizzes.length)];
+  lastQuizId = currentQuiz.id;
+  
+  shuffledChoices = currentQuiz.choices
+    .map((c, i) => ({c, ok: i === currentQuiz.answer}))
+    .sort(() => Math.random() - 0.5);
+  
+  document.getElementById("question").textContent = `問題：${currentQuiz.question}`;
+  
+  const container = document.getElementById("choicesContainer");
+  container.innerHTML = "";
+  
+  const choiceNumbers = ["①", "②", "③", "④"];
+  shuffledChoices.forEach((choice, index) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "choice-btn-full";
+    btn.innerHTML = `<span class="choice-number">${choiceNumbers[index]}</span>${choice.c}`;
+    btn.addEventListener('click', function() {
+      selectChoice(index);
+    });
+    container.appendChild(btn);
+  });
+}
+
+function flash(cls) {
+  const f = document.getElementById("screenFlash");
+  f.className = "";
+  void f.offsetWidth;
+  f.className = cls;
+}
+
+function popup(text, color) {
+  const p = document.getElementById("popupText");
+  p.textContent = text;
+  p.style.color = color;
+  p.className = "popup-show";
+  setTimeout(() => p.className = "", 1000);
+}
+
+function selectChoice(index) {
+  if (!isAnswering || isGameOver) return;
+  
+  // すべての選択肢から選択状態を解除
+  const buttons = document.querySelectorAll(".choice-btn-full");
+  buttons.forEach(btn => btn.classList.remove("selected"));
+  
+  // クリックした選択肢を選択状態にする
+  buttons[index].classList.add("selected");
+  selectedIndex = index;
+  
+  // 解答ボタンを表示
+  document.getElementById("answerBtn").style.display = "inline-block";
+}
+
+function submitAnswer() {
+  if (selectedIndex === null || !isAnswering || isGameOver) return;
+  
+  handleAnswer(selectedIndex);
+  
+  // 解答ボタンを非表示
+  document.getElementById("answerBtn").style.display = "none";
+}
+
+function handleAnswer(i) {
+  if (!isAnswering || isGameOver) return;
+  isAnswering = false;
+  
+  const buttons = document.querySelectorAll(".choice-btn-full");
+  buttons.forEach(btn => btn.disabled = true);
+
+  if (shuffledChoices[i].ok) {
+    correctAnswers++;
+    currentCombo++;
+    if (currentCombo > maxCombo) {
+      maxCombo = currentCombo;
+    }
+    
+    // HP回復チェック（10の倍数）
+    if (currentCombo > 0 && currentCombo % 10 === 0) {
+      playerHP = Math.min(100, playerHP + 10);
+      popup(`${currentCombo}連続正解！HP回復！`, "#00FF00");
+      flash("flash-heal");
+      if (navigator.vibrate) {
+        navigator.vibrate([50, 50, 50, 50, 50]);
+      }
+    }
+    
+    updateScore();
+    changeDifficulty(); // 難易度変更チェック
+    
+    const willDefeatMonster = (enemyHP - 25) <= 0;
+    enemyHP = Math.max(0, enemyHP - 25);
+    
+    if (!willDefeatMonster) {
+      flash("flash-correct");
+      if (currentCombo % 10 !== 0) { // HP回復時はPERFECT表示をスキップ
+        popup("PERFECT!!", "gold");
+      }
+    }
+    
+    if (willDefeatMonster) {
+      defeat();
+    }
+  } else {
+    wrongAnswers++;
+    currentCombo = 0;
+    updateScore();
+    
+    const willGameOver = (playerHP - 25) <= 0;
+    playerHP = Math.max(0, playerHP - 25);
+    
+    if (!willGameOver) {
+      flash("flash-wrong");
+      popup("MISS...", "red");
+      if (navigator.vibrate) {
+        navigator.vibrate([100, 50, 100]);
+      }
+    }
+    
+    if (willGameOver) {
+      if (navigator.vibrate) {
+        navigator.vibrate([100, 50, 100]);
+      }
+      gameOver();
+      return;
+    }
+  }
+
+  document.getElementById("explanation").textContent = currentQuiz.explanation;
+  updateHP();
+  
+  if (!isGameOver) {
+    document.getElementById("nextBtn").style.display = "inline-block";
+  }
+}
+
+function defeat() {
+  defeatedCount++;
+  updateScore();
+  
+  const p = document.getElementById("popupText");
+  p.className = "";
+  p.textContent = "";
+  
+  const f = document.getElementById("screenFlash");
+  f.className = "";
+  
+  const levelUp = document.getElementById("levelUpEffect");
+  levelUp.className = "";
+  
+  document.getElementById("defeatEffect").classList.add("show");
+  document.getElementById("monsterImg").classList.add("defeat");
+  
+  setTimeout(() => {
+    document.getElementById("defeatEffect").classList.remove("show");
+  }, 1000);
+}
+
+function gameOver() {
+  isGameOver = true;
+  
+  const p = document.getElementById("popupText");
+  p.className = "";
+  p.textContent = "";
+  
+  const f = document.getElementById("screenFlash");
+  f.className = "";
+  
+  const levelUp = document.getElementById("levelUpEffect");
+  levelUp.className = "";
+  
+  const now = new Date();
+  gameOverDateTime = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+  
+  const playTimeSeconds = Math.floor((Date.now() - gameStartTime) / 1000);
+  const minutes = Math.floor(playTimeSeconds / 60);
+  const seconds = playTimeSeconds % 60;
+  const playTimeText = `${minutes}分${seconds}秒`;
+  
+  const totalQuestions = correctAnswers + wrongAnswers;
+  const accuracyPercent = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+  
+  let rank, rankClass;
+  if (accuracyPercent >= 90) {
+    rank = "S";
+    rankClass = "rank-S";
+  } else if (accuracyPercent >= 75) {
+    rank = "A";
+    rankClass = "rank-A";
+  } else if (accuracyPercent >= 60) {
+    rank = "B";
+    rankClass = "rank-B";
+  } else if (accuracyPercent >= 40) {
+    rank = "C";
+    rankClass = "rank-C";
+  } else {
+    rank = "D";
+    rankClass = "rank-D";
+  }
+  
+  const comment = comments.length > 0 
+    ? comments[Math.floor(Math.random() * comments.length)]
+    : "お疲れ様でした！";
+  
+  document.getElementById("gameoverEffect").classList.add("show");
+  
+  setTimeout(() => {
+    document.getElementById("game").style.display = "none";
+    document.getElementById("resultScreen").style.display = "block";
+    
+    document.getElementById("rankDisplay").textContent = rank;
+    document.getElementById("rankDisplay").className = rankClass;
+    document.getElementById("gameoverDateTime").textContent = gameOverDateTime;
+    document.getElementById("playTime").textContent = playTimeText;
+    document.getElementById("finalDefeated").textContent = defeatedCount;
+    document.getElementById("correctCount").textContent = correctAnswers;
+    document.getElementById("wrongCount").textContent = wrongAnswers;
+    document.getElementById("accuracy").textContent = `${accuracyPercent}%`;
+    document.getElementById("maxCombo").textContent = maxCombo;
+    
+    // 最高難易度を表示
+    let maxDifficultyText = "";
+    if (maxDifficulty === "beginner") {
+      maxDifficultyText = "初級";
+    } else if (maxDifficulty === "intermediate") {
+      maxDifficultyText = "中級";
+    } else if (maxDifficulty === "advanced") {
+      maxDifficultyText = "上級";
+    }
+    document.getElementById("maxDifficultyDisplay").textContent = maxDifficultyText;
+    
+    document.getElementById("rankComment").textContent = comment;
+    
+    document.getElementById("gameoverEffect").classList.remove("show");
+  }, 2000);
+}
+
+function updateHP() {
+  document.getElementById("playerBar").style.width = playerHP + "%";
+  document.getElementById("enemyBar").style.width = enemyHP + "%";
+  document.getElementById("playerHPText").textContent = `${playerHP}/100`;
+  document.getElementById("enemyHPText").textContent = `${enemyHP}/100`;
+}
+
+function updateScore() {
+  document.getElementById("defeatedCount").textContent = defeatedCount;
+  document.getElementById("comboCount").textContent = currentCombo;
+  
+  // 難易度表示を更新
+  const difficultyDisplay = document.getElementById("difficultyDisplay");
+  let difficultyText = "";
+  let difficultyColor = "";
+  
+  if (currentDifficulty === "beginner") {
+    difficultyText = "初級";
+    difficultyColor = "#00FF00";
+  } else if (currentDifficulty === "intermediate") {
+    difficultyText = "中級";
+    difficultyColor = "#FFC107";
+  } else if (currentDifficulty === "advanced") {
+    difficultyText = "上級";
+    difficultyColor = "#FF1744";
+  }
+  
+  difficultyDisplay.textContent = difficultyText;
+  difficultyDisplay.style.color = difficultyColor;
+}
+
+function changeDifficulty() {
+  if (currentCombo >= 5 && currentDifficulty !== "advanced") {
+    currentDifficulty = "advanced";
+    quizzes = quizzesAdvanced;
+    maxDifficulty = "advanced";
+    showLevelUpEffect("上級", "advanced");
+  } else if (currentCombo >= 3 && currentDifficulty === "beginner") {
+    currentDifficulty = "intermediate";
+    quizzes = quizzesIntermediate;
+    if (maxDifficulty === "beginner") {
+      maxDifficulty = "intermediate";
+    }
+    showLevelUpEffect("中級", "intermediate");
+  }
+  updateScore();
+}
+
+function showLevelUpEffect(difficultyText, difficultyClass) {
+  // バイブレーション
+  if (navigator.vibrate) {
+    navigator.vibrate([200, 100, 200, 100, 200]);
+  }
+  
+  // 画面フラッシュ
+  const f = document.getElementById("screenFlash");
+  f.className = "";
+  void f.offsetWidth;
+  f.className = `flash-levelup-${difficultyClass}`;
+  
+  // レベルアップエフェクト表示
+  const effect = document.getElementById("levelUpEffect");
+  const text = document.getElementById("levelUpText");
+  const difficulty = document.getElementById("levelUpDifficulty");
+  
+  text.textContent = "LEVEL UP!!";
+  difficulty.textContent = difficultyText;
+  
+  effect.className = `show ${difficultyClass}`;
+  
+  setTimeout(() => {
+    effect.className = "";
+  }, 2500);
+}
+</script>
+
+</body>
+</html>
